@@ -6,6 +6,8 @@ Instead of every user downloading content from a single origin server, PeerCDN l
 
 The system is inspired by peer-to-peer protocols such as BitTorrent and traditional CDN architectures.
 
+![Architecture](./images/architecture.png)
+
 ---
 
 # How It Works
