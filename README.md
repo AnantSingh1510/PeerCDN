@@ -256,6 +256,19 @@ Distribute the manifest out-of-band (HTTP, paste, whatever). The manifest ID dou
 - browser client (same HTTP chunk fetching, rarest-first, announces after download)
 - seed-after-download — leecher automatically becomes seeder on completion
 
+## Workflow
+```mermaid
+graph LR
+    File -->|512KB blocks + SHA-256| Manifest
+    Manifest -->|announce| Tracker
+    Tracker -->|who has chunk N?| Peers
+    Peers -->|HTTP GET /peer/chunk/...| Downloader
+    Downloader -->|verify + store| Disk
+    Disk -->|assemble| Output
+    Downloader -->|no peers?| Origin
+    Output -->|announce| Tracker
+```
+
 ## Known gaps
 
 - no origin server binary yet — you need to bring your own HTTP server for the fallback
