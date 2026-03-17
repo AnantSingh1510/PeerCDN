@@ -1,8 +1,8 @@
 # PeerCDN
 
-P2P content delivery network written in Go. Files are split into chunks and served directly between peers — the central server only handles peer discovery and never sees file data. Built this as a side project in my 3rd year of BTech after getting frustrated reading about how CDNs work without any good hands-on examples.
+P2P content delivery network written in Go. Files are split into chunks and served directly between peers, the central server only handles peer discovery and never sees file data. Built this as a side project in my 3rd year of BTech after getting frustrated reading about how CDNs work without any good hands-on examples.
 
-The architecture is closer to a stripped-down BitTorrent than a traditional CDN. A tracker maintains a registry of which peers hold which chunks. Downloaders query the tracker, get a list of peers, and fetch directly over HTTP. Chunks are SHA-256 verified before being written to disk. The tracker itself is just a WebSocket server — lightweight enough to run on a $5 VPS.
+The architecture is closer to a stripped-down BitTorrent than a traditional CDN. A tracker maintains a registry of which peers hold which chunks. Downloaders query the tracker, get a list of peers, and fetch directly over HTTP. Chunks are SHA-256 verified before being written to disk. The tracker itself is just a WebSocket server, lightweight enough to run on a $5 VPS.
 
 ### This project supports all mime types and works like BitTorrent and Cloudflare combined, I built this as a side project during my college 3rd year, would try my best to improve upon this in coming time.
 
