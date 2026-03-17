@@ -178,30 +178,22 @@ go mod tidy && make all
 ```
 
 ```bash
-# 1. tracker
 ./bin/tracker --addr :8080
 
-# 2. chunk a file
 ./bin/chunker --file ./movie.mp4 --out ./chunks --mime video/mp4
 
-# 3. seed
 ./bin/peer seed \
   --tracker ws://localhost:8080/ws \
   --manifest ./chunks/<id>.json \
   --store ./chunks \
   --listen :9001
 
-# 4. download (different machine or terminal)
 ./bin/peer get \
   --tracker ws://localhost:8080/ws \
   --manifest ./chunks/<id>.json \
   --store ./dl-chunks \
   --origin http://your-origin:9000 \
   --out ./movie-copy.mp4
-
-# 5. browser
-cd web/static && python3 -m http.server 8081
-# open localhost:8081, drop in the manifest JSON
 ```
 
 ---
