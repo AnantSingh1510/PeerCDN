@@ -265,6 +265,5 @@ graph LR
 
 - no origin server binary is created yet,you need to bring your own HTTP server for the fallback
 - Go↔Go peer address resolution works but browser peers can't serve chunks back (browsers can't run HTTP servers), so browser to browser transfer needs WebRTC which isn't wired up yet
-- no resume -- if a download is interrupted you start over
 - tracker has no auth, rate limiting, or persistence, it's purely in-memory
 - TURN server integration missing, so peers behind strict NATs will silently fall back to origin
