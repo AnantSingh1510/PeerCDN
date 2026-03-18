@@ -13,7 +13,8 @@ import (
 
 	"nhooyr.io/websocket"
 	"nhooyr.io/websocket/wsjson"
-
+	
+	"github.com/peercdn/peercdn/internal/tlsutil"
 	"github.com/peercdn/peercdn/internal/chunk"
 	"github.com/peercdn/peercdn/internal/manifest"
 	"github.com/peercdn/peercdn/internal/signaling"
@@ -28,10 +29,13 @@ const (
 )
 
 type Config struct {
-	TrackerURL string
-	OriginURL  string 
-	StoreDir   string
-	ListenAddr string
+    TrackerURL string
+    OriginURL  string
+    StoreDir   string
+    ListenAddr string
+    CertFile   string
+    KeyFile    string
+    NoTLS      bool
 }
 
 type Peer struct {
@@ -58,7 +62,7 @@ func New(cfg Config, log *slog.Logger) (*Peer, error) {
 }
 
 func (p *Peer) Start(ctx context.Context) error {
-	tc, err := dialTracker(ctx, p.cfg.TrackerURL, p.log)
+	tc, err := dialTracker(ctx, p.cfg.TrackerURL, p.cfg.NoTLS, p.log)
 	if err != nil {
 		return fmt.Errorf("dial tracker: %w", err)
 	}
@@ -240,11 +244,23 @@ func (p *Peer) fetchFromGoPeer(ctx context.Context, remotePeerID, remoteAddr, ma
     if remoteAddr == "" {
         return nil, fmt.Errorf("no address known for peer %s", remotePeerID[:8])
     }
-    url := "http://" + remoteAddr + "/peer/chunk/" + manifestID + "/" + chunkHash
-    rctx, cancel := context.WithTimeout(ctx, chunkRequestTimeout)
-    defer cancel()
-    req, _ := http.NewRequestWithContext(rctx, http.MethodGet, url, nil)
-    resp, err := http.DefaultClient.Do(req)
+    scheme := "https"
+	if p.cfg.NoTLS {
+		scheme = "http"
+	}
+	url := scheme + "://" + remoteAddr + "/peer/chunk/" + manifestID + "/" + chunkHash
+	client := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: tlsutil.InsecureClientConfig(),
+		},
+	}
+	if p.cfg.NoTLS {
+		client = http.DefaultClient
+	}
+	rctx, cancel := context.WithTimeout(ctx, chunkRequestTimeout)
+	defer cancel()
+	req, _ := http.NewRequestWithContext(rctx, http.MethodGet, url, nil)
+	resp, err := client.Do(req)
     if err != nil {
         return nil, fmt.Errorf("http get: %w", err)
     }
@@ -300,17 +316,27 @@ func (p *Peer) listenInbound(ctx context.Context) {
 	mux.HandleFunc("/peer/chunk/", p.serveChunkHTTP)
 	srv := &http.Server{Addr: p.cfg.ListenAddr, Handler: mux}
 
-	if *listenAddr != "" && !strings.Contains(*listenAddr, ":") {
-		log.Error("--listen must be host:port, e.g. 192.168.1.10:9001")
-		os.Exit(1)
-	}
-
-	p.log.Info("listening for inbound peer connections", "addr", p.cfg.ListenAddr)
 	go func() {
 		<-ctx.Done()
 		_ = srv.Close()
 	}()
-	if err := srv.ListenAndServe(); err != nil && ctx.Err() == nil {
+
+	if p.cfg.NoTLS {
+		p.log.Info("listening without TLS", "addr", p.cfg.ListenAddr)
+		if err := srv.ListenAndServe(); err != nil && ctx.Err() == nil {
+			p.log.Error("inbound listener error", "err", err)
+		}
+		return
+	}
+
+	tlsCfg, err := tlsutil.ServerConfig(p.cfg.CertFile, p.cfg.KeyFile)
+	if err != nil {
+		p.log.Error("TLS setup failed", "err", err)
+		return
+	}
+	srv.TLSConfig = tlsCfg
+	p.log.Info("listening with TLS", "addr", p.cfg.ListenAddr, "auto-cert", p.cfg.CertFile == "")
+	if err := srv.ListenAndServeTLS("", ""); err != nil && ctx.Err() == nil {
 		p.log.Error("inbound listener error", "err", err)
 	}
 }
@@ -368,8 +394,18 @@ type queryKey struct {
 	chunkIndex int
 }
 
-func dialTracker(ctx context.Context, url string, log *slog.Logger) (*trackerConn, error) {
-	conn, _, err := websocket.Dial(ctx, url, &websocket.DialOptions{CompressionMode: websocket.CompressionDisabled})
+func dialTracker(ctx context.Context, url string, noTLS bool, log *slog.Logger) (*trackerConn, error) {
+    opts := &websocket.DialOptions{
+        CompressionMode: websocket.CompressionDisabled,
+    }
+    if !noTLS {
+        opts.HTTPClient = &http.Client{
+            Transport: &http.Transport{
+                TLSClientConfig: tlsutil.InsecureClientConfig(),
+            },
+        }
+    }
+    conn, _, err := websocket.Dial(ctx, url, opts)
 	if err != nil {
 		return nil, err
 	}

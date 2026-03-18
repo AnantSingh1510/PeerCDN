@@ -44,6 +44,9 @@ func runSeed(args []string) {
 	manifestPath := fs.String("manifest", "", "path to manifest JSON (required)")
 	storeDir    := fs.String("store", "./chunks", "chunk store directory")
 	listenAddr  := fs.String("listen", "", "address to accept inbound peer connections")
+	certFile := fs.String("cert", "", "TLS cert file (auto-generated if omitted)")
+	keyFile  := fs.String("key", "", "TLS key file (auto-generated if omitted)")
+	noTLS    := fs.Bool("no-tls", false, "disable TLS")
 	_ = fs.Parse(args)
 
 	if *manifestPath == "" {
@@ -65,6 +68,9 @@ func runSeed(args []string) {
 		TrackerURL: *trackerURL,
 		StoreDir:   *storeDir,
 		ListenAddr: *listenAddr,
+		CertFile: *certFile,
+		KeyFile:  *keyFile,
+		NoTLS:    *noTLS,
 	}, log)
 	if err != nil {
 		log.Error("create peer", "err", err)
@@ -90,6 +96,9 @@ func runGet(args []string) {
 	storeDir     := fs.String("store", "./chunks", "chunk store directory")
 	originURL    := fs.String("origin", "", "origin HTTP URL for fallback (optional)")
 	outPath      := fs.String("out", "", "output file path (required)")
+	certFile := fs.String("cert", "", "TLS cert file (auto-generated if omitted)")
+	keyFile  := fs.String("key", "", "TLS key file (auto-generated if omitted)")
+	noTLS    := fs.Bool("no-tls", false, "disable TLS")
 	_ = fs.Parse(args)
 
 	if *manifestPath == "" || *outPath == "" {
@@ -111,6 +120,9 @@ func runGet(args []string) {
 		TrackerURL: *trackerURL,
 		OriginURL:  *originURL,
 		StoreDir:   *storeDir,
+		CertFile: *certFile,
+		KeyFile:  *keyFile,
+		NoTLS:    *noTLS,
 	}, log)
 	if err != nil {
 		log.Error("create peer", "err", err)
@@ -120,9 +132,14 @@ func runGet(args []string) {
 	if state, err := peer.LoadState(*storeDir, m.ID); err == nil && state != nil {
 		if state.CompletedAt != nil {
 			log.Info("already completed previously, re-assembling")
-		} else {
-			log.Info("resuming interrupted download")
+			if err := assembleChunks(*storeDir, m, *outPath); err != nil {
+				log.Error("assemble failed", "err", err)
+				os.Exit(1)
+			}
+			log.Info("done", "out", *outPath)
+			os.Exit(0)
 		}
+		log.Info("resuming interrupted download")
 	}
 
 	if err := p.Start(ctx); err != nil {
