@@ -233,7 +233,7 @@ WebSocket + JSON frames. The tracker is purely a coordination layer.
 }
 ```
 
-Distribute the manifest out-of-band (HTTP, paste, whatever). The manifest ID doubles as a content address — if the file changes the ID changes.
+Distribute the manifest out-of-band (HTTP, paste, whatever). The manifest ID doubles as a content address, if the file changes the ID changes.
 
 ---
 
@@ -246,7 +246,7 @@ Distribute the manifest out-of-band (HTTP, paste, whatever). The manifest ID dou
 - direct HTTP peer-to-peer transfer
 - origin HTTP fallback
 - browser client (same HTTP chunk fetching, rarest-first, announces after download)
-- seed-after-download — leecher automatically becomes seeder on completion
+- seed-after-download -- leecher automatically becomes seeder on completion
 
 ## Workflow
 ```mermaid
@@ -263,8 +263,8 @@ graph LR
 
 ## Known gaps
 
-- no origin server binary yet — you need to bring your own HTTP server for the fallback
-- Go↔Go peer address resolution works but browser peers can't serve chunks back (browsers can't run HTTP servers), so browser→browser transfer needs WebRTC which isn't wired up yet
-- no resume — if a download is interrupted you start over
-- tracker has no auth, rate limiting, or persistence — it's purely in-memory
+- no origin server binary is created yet,you need to bring your own HTTP server for the fallback
+- Go↔Go peer address resolution works but browser peers can't serve chunks back (browsers can't run HTTP servers), so browser to browser transfer needs WebRTC which isn't wired up yet
+- no resume -- if a download is interrupted you start over
+- tracker has no auth, rate limiting, or persistence, it's purely in-memory
 - TURN server integration missing, so peers behind strict NATs will silently fall back to origin

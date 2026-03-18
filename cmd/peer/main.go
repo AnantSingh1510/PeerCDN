@@ -116,13 +116,22 @@ func runGet(args []string) {
 		log.Error("create peer", "err", err)
 		os.Exit(1)
 	}
+
+	if state, err := peer.LoadState(*storeDir, m.ID); err == nil && state != nil {
+		if state.CompletedAt != nil {
+			log.Info("already completed previously, re-assembling")
+		} else {
+			log.Info("resuming interrupted download")
+		}
+	}
+
 	if err := p.Start(ctx); err != nil {
 		log.Error("start peer", "err", err)
 		os.Exit(1)
 	}
 
 	log.Info("starting download", "manifest", m.ID[:12], "chunks", m.ChunkCount())
-	if err := p.Download(ctx, m); err != nil {
+	if err := p.Download(ctx, m, *manifestPath, *outPath); err != nil {
 		log.Error("download failed", "err", err)
 		os.Exit(1)
 	}

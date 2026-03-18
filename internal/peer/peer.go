@@ -94,7 +94,13 @@ func (p *Peer) Announce(m *manifest.Manifest) error {
 	})
 }
 
-func (p *Peer) Download(ctx context.Context, m *manifest.Manifest) error {
+func (p *Peer) Download(ctx context.Context, m *manifest.Manifest, manifestPath, outputPath string) error {
+	lock, err := acquireLock(p.cfg.StoreDir, m.ID)
+	if err != nil {
+		return err
+	}
+	defer releaseLock(lock, p.cfg.StoreDir, m.ID)
+
 	have := p.store.HaveChunks(m)
 	missing := make([]int, 0, len(have))
 	for i, h := range have {
@@ -102,9 +108,26 @@ func (p *Peer) Download(ctx context.Context, m *manifest.Manifest) error {
 			missing = append(missing, i)
 		}
 	}
+
+	alreadyHave := len(m.Chunks) - len(missing)
+	if alreadyHave > 0 && len(missing) > 0 {
+		p.log.Info("resuming download", "have", alreadyHave, "missing", len(missing), "total", len(m.Chunks))
+	}
+
 	if len(missing) == 0 {
 		p.log.Info("all chunks already present", "manifest", m.ID[:12])
-		return nil
+		_ = markComplete(p.cfg.StoreDir, m.ID)
+		return p.Announce(m)
+	}
+
+	if err := saveState(p.cfg.StoreDir, &downloadState{
+		ManifestID:   m.ID,
+		ManifestPath: manifestPath,
+		OutputPath:   outputPath,
+		TrackerURL:   p.cfg.TrackerURL,
+		OriginURL:    p.cfg.OriginURL,
+	}); err != nil {
+		p.log.Warn("could not save resume state", "err", err)
 	}
 
 	order, err := p.rarestFirst(ctx, m.ID, missing)
@@ -112,7 +135,6 @@ func (p *Peer) Download(ctx context.Context, m *manifest.Manifest) error {
 		p.log.Warn("rarest-first fallback to sequential", "err", err)
 		order = missing
 	}
-
 	sem := make(chan struct{}, maxConcurrentDownloads)
 	var wg sync.WaitGroup
 	var mu sync.Mutex
@@ -138,7 +160,9 @@ func (p *Peer) Download(ctx context.Context, m *manifest.Manifest) error {
 		return fmt.Errorf("%d chunks failed, first: %w", len(errs), errs[0])
 	}
 
-	// full file is complete
+	if err := markComplete(p.cfg.StoreDir, m.ID); err != nil {
+		p.log.Warn("could not mark download complete", "err", err)
+	}
 	return p.Announce(m)
 }
 
