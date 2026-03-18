@@ -300,6 +300,11 @@ func (p *Peer) listenInbound(ctx context.Context) {
 	mux.HandleFunc("/peer/chunk/", p.serveChunkHTTP)
 	srv := &http.Server{Addr: p.cfg.ListenAddr, Handler: mux}
 
+	if *listenAddr != "" && !strings.Contains(*listenAddr, ":") {
+		log.Error("--listen must be host:port, e.g. 192.168.1.10:9001")
+		os.Exit(1)
+	}
+
 	p.log.Info("listening for inbound peer connections", "addr", p.cfg.ListenAddr)
 	go func() {
 		<-ctx.Done()
